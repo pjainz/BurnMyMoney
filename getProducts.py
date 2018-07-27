@@ -1,18 +1,49 @@
 from selenium import webdriver
 import random
 import re
-from amazonproduct import API, ResultPaginator, AWSError
-from config import AWS_KEY, SECRET_KEY
+from lxml import html  
+import csv,os,json
+import requests
+from time import sleep
 
-upperbound = 10
-lowerbound = 5
+def AmzonParser(asin):
+    headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.90 Safari/537.36'}
+    url = "https://www.amazon.com/dp/" + asin 
+    page = requests.get(url,headers=headers)
+    while True:
+        # sleep(3)
+        try:
+            doc = html.fromstring(page.content)
+            XPATH_NAME = '//h1[@id="title"]//text()'
+            XPATH_SALE_PRICE = '//span[contains(@id,"ourprice") or contains(@id,"saleprice")]/text()'
+            XPATH_ORIGINAL_PRICE = '//td[contains(text(),"List Price") or contains(text(),"M.R.P") or contains(text(),"Price")]/following-sibling::td/text()'
+            XPATH_CATEGORY = '//a[@class="a-link-normal a-color-tertiary"]//text()'
+            XPATH_AVAILABILITY = '//div[@id="availability"]//text()'
+ 
+            RAW_NAME = doc.xpath(XPATH_NAME)
+            RAW_SALE_PRICE = doc.xpath(XPATH_SALE_PRICE)
+            RAW_CATEGORY = doc.xpath(XPATH_CATEGORY)
+            RAW_ORIGINAL_PRICE = doc.xpath(XPATH_ORIGINAL_PRICE)
+            RAw_AVAILABILITY = doc.xpath(XPATH_AVAILABILITY)
+ 
+            NAME = ' '.join(''.join(RAW_NAME).split()) if RAW_NAME else None
+            SALE_PRICE = ' '.join(''.join(RAW_SALE_PRICE).split()).strip() if RAW_SALE_PRICE else None
+            ORIGINAL_PRICE = ''.join(RAW_ORIGINAL_PRICE).strip() if RAW_ORIGINAL_PRICE else None
+            # AVAILABILITY = ''.join(RAw_AVAILABILITY).strip() if RAw_AVAILABILITY else None
+ 
+            if not ORIGINAL_PRICE:
+                ORIGINAL_PRICE = SALE_PRICE
+ 
+            if page.status_code!=200:
+            	raise ValueError('captha')
 
-def price_offers(asin):
-    api = API(AWS_KEY, SECRET_KEY, 'de')
-    str_asin = str(asin)
-    node = api.item_lookup(id=str_asin, ResponseGroup='Offers', Condition='All', MerchantId='All')
-    for a in node.Items.Item.Offers.Offer:
-        print(a.OfferListing.Price.FormattedPrice)
+            if NAME is not None and SALE_PRICE is not None: 
+            	print(asin + "\t" + NAME + "\t" + SALE_PRICE)
+            return
+
+        except Exception as e:
+            print(e)
+
 
 category = ["37e2e580-8091-4621-b9c3-237f6f9f2af4/ref=strm_theme_omg",
 			"2ad85be4-a868-4c09-be6f-caa113ce00b3/ref=strm_theme_fun",
@@ -43,15 +74,13 @@ category = ["37e2e580-8091-4621-b9c3-237f6f9f2af4/ref=strm_theme_omg",
 
 baseurl = "https://www.amazon.com/"
 driver = webdriver.PhantomJS(executable_path = '/Users/jainpr/Downloads/phantomjs-2.1.1-macosx/bin/phantomjs')
-asins = []
 
 for c in category:
 	driver.get(baseurl + "stream/" + c)
-	html = driver.execute_script("return document.documentElement.innerHTML;")
+	webpage = driver.execute_script("return document.documentElement.innerHTML;")
 	finder = re.compile('data-fling-asin=&quot;([a-zA-Z0-9]*)&quot;')
-	temp = finder.findall(html)
+	temp = set(finder.findall(webpage))
 	for t in temp:
-		price_offers(t)
-	asins.extend(temp)
+		AmzonParser(t)
 
 
