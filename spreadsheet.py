@@ -32,7 +32,7 @@ def updatePos (user_id, pos):
 			sheet.update_cell(index, 2, pos)
 		index += 1
 
-def delete (user_id)
+def delete (user_id):
 	index = 2
 	while index < sheet.cell(2,5):
 		cell = sheet.cell(index, 1)
